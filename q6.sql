@@ -13,10 +13,15 @@ CREATE TABLE q6 (
 -- (But give them better names!) The IF EXISTS avoids generating an error
 -- the first time this file is imported.
 -- If you do not define any views, you can delete the lines about views.
-DROP VIEW IF EXISTS intermediate_step CASCADE;
+DROP VIEW IF EXISTS SingleAuthorBooks CASCADE;
 
 -- Define views for your intermediate steps here:
-CREATE VIEW intermediate_step AS ... ;
+CREATE VIEW SingleAuthorBooks AS
+SELECT id
+FROM Holding JOIN HoldingContributor ON id = holding
+WHERE htype = 'books'
+GROUP BY id
+HAVING count(contributor) = 1;
 
 -- Your query that answers the question goes below the "insert into" line:
 INSERT INTO q6
