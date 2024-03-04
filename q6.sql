@@ -115,6 +115,6 @@ INTERSECT
 
 -- Your query that answers the question goes below the "insert into" line:
 INSERT INTO q6
-SELECT p.card_number, count(contributor)
+SELECT p.card_number AS patronID, count(contributor) AS devotedness
 FROM Patron p LEFT JOIN AllConds ac ON p.card_number = ac.patron
 GROUP BY p.card_number;
