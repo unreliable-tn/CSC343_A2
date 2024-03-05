@@ -81,7 +81,9 @@ WHERE pa.count >= (
 -- Get all reviews each patron left for each author
 CREATE VIEW AuthorReviews AS
 SELECT DISTINCT pa.patron, pa.contributor, pa.holding, r.stars
-FROM PatronAuthor pa JOIN Review r ON pa.holding = r.holding;
+FROM PatronAuthor pa JOIN Review r
+ON pa.patron = r.patron
+AND pa.holding = r.holding;
 
 -- Get every patron who has reviewed all of the corresponding authors book that they have checked out
 CREATE VIEW ReviewedAll AS
