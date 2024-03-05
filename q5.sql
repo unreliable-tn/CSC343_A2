@@ -52,11 +52,15 @@ HAVING count(DISTINCT month) >= 5;
 
 -- Get every patron who did not check out a book in 2024
 CREATE VIEW NotActive2024 AS
-SELECT patron
+SELECT DISTINCT patron
 FROM CheckoutDetails
-WHERE year = 2024
-GROUP BY patron
-HAVING count(DISTINCT month) = 0;
+WHERE patron NOT IN (
+    SELECT patron
+    FROM CheckoutDetails
+    WHERE year = 2024
+    GROUP BY patron
+    HAVING count(DISTINCT month) <> 0
+);
 
 -- Get checkout details of the patrons that meet the above 3 criteria
 CREATE VIEW CheckoutDetailsValid AS
@@ -93,14 +97,14 @@ GROUP BY patron;
 
 -- Get each patron and their decline
 CREATE VIEW PatronDecline AS 
-SELECT cd.patron AS patronID, COALESCE(c2.count2022, 0) - COALESCE(c3.count2023, 0) AS decline
+SELECT DISTINCT cd.patron AS patronID, COALESCE(c2.count2022, 0) - COALESCE(c3.count2023, 0) AS decline
 FROM CheckoutDetailsValid cd
 LEFT JOIN Checkouts2022 c2 ON cd.patron = c2.patron
 JOIN Checkouts2023 c3 ON c2.patron = c3.patron;
 
 --Get each patron and the amount of months they did not checkout out anything in 2023
 CREATE VIEW PatronMissed AS
-SELECT patron AS patronID, count(distinct month) AS missed
+SELECT patron AS patronID, 12 - count(distinct month) AS missed
 FROM CheckoutDetailsValid
 WHERE year = 2023
 GROUP BY patron;
