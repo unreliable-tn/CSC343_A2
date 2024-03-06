@@ -47,7 +47,7 @@ WHERE id NOT IN (
 -- Delete all events that have no sessions
 DELETE FROM LibraryEvent
 WHERE id IN (
-    SELETC * FROM NoSessions
+    SELECT * FROM NoSessions
 );
 
 -- Remove any signups for events that have no sessions
