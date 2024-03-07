@@ -10,24 +10,24 @@ DROP VIEW IF EXISTS NoSessions CASCADE;
 
 -- Get the id, room, start and end time of each event
 CREATE VIEW EventDetails1 AS
-SELECT le.id, le.room, TO_CHAR(es.edate, 'dy') AS edate, es.start_time, es.end_time
+SELECT le.id, le.room, es.edate, TO_CHAR(es.edate, 'dy') AS eday, es.start_time, es.end_time
 FROM LibraryEvent le JOIN EventSchedule es ON le.id = es.event;
 
 -- Get id, library, start and end time of each event
 CREATE VIEW EventDetails2 AS
-SELECT ed1.id, lr.library, ed1.edate, ed1.start_time, ed1.end_time 
+SELECT ed1.id, lr.library, ed1.edate, ed1.eday, ed1.start_time, ed1.end_time 
 FROM EventDetails1 ed1 JOIN LibraryRoom lr ON ed1.room = lr.id;
 
 -- Get id, library, start and end time of each event and open and close time of each library
 CREATE VIEW EventDetails AS 
-SELECT ed2.id, ed2.library, ed2.edate, ed2.start_time, ed2.end_time, lh.day, lh.start_time AS open, lh.end_time AS close
+SELECT ed2.id, ed2.library, ed2.edate, ed2.eday, ed2.start_time, ed2.end_time, lh.day, lh.start_time AS open, lh.end_time AS close
 FROM EventDetails2 ed2 JOIN LibraryHours lh ON ed2.library = lh.library;
 
 -- Get all event ids that are out of bounds
 CREATE VIEW OutOfBoundsEvents AS
-SELECT DISTINCT id
+SELECT DISTINCT id, edate
 FROM EventDetails
-WHERE edate = CAST(day AS VARCHAR)
+WHERE eday = CAST(day AS VARCHAR)
 AND (
     start_time < open
     OR end_time > close
@@ -40,21 +40,21 @@ FROM (SELECT DISTINCT library FROM LibraryHours) l, (SELECT DISTINCT day FROM Li
 
 -- Get all days when each library is closed and then the events on those days
 CREATE VIEW NotOnDay AS
-SELECT DISTINCT id
+SELECT DISTINCT ed.id, ed.edate
 FROM (
     (SELECT * FROM AllCombos)
     EXCEPT
     (SELECT library, day FROM LibraryHours)
 ) n JOIN EventDetails ed
 ON n.library = ed.library
-AND CAST(n.day AS VARCHAR) = ed.edate;
+AND CAST(n.day AS VARCHAR) = ed.eday;
 
 -- Delete all out of bounds events
 DELETE FROM EventSchedule
-WHERE event IN (
-    (SELECT id FROM OutOfBoundsEvents)
+WHERE event, edate IN (
+    (SELECT id, edate FROM OutOfBoundsEvents)
     UNION
-    (SELECT id FROM NotOnDay)
+    (SELECT id, edate FROM NotOnDay)
 );
 
 -- Get all events that no longer have any sessions
