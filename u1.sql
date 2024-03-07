@@ -50,11 +50,15 @@ ON n.library = ed.library
 AND CAST(n.day AS VARCHAR) = ed.eday;
 
 -- Delete all out of bounds events
-DELETE FROM EventSchedule
-WHERE event, edate IN (
-    (SELECT id, edate FROM OutOfBoundsEvents)
-    UNION
-    (SELECT id, edate FROM NotOnDay)
+DELETE FROM EventSchedule es
+WHERE EXISTS (
+    SELECT * FROM (
+        (SELECT id, edate FROM OutOfBoundsEvents)
+        UNION
+        (SELECT id, edate FROM NotOnDay)
+    ) n
+    WHERE es.event = n.id
+    AND es.edate = n.edate
 );
 
 -- Get all events that no longer have any sessions
