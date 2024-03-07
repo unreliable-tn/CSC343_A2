@@ -33,10 +33,12 @@ AND (
     OR end_time > close
 );
 
+-- Get all combos of libraries and days of the week
 CREATE VIEW AllCombos AS
 SELECT *
 FROM (SELECT DISTINCT library FROM LibraryHours) l, (SELECT DISTINCT day FROM LibraryHours) d;
 
+-- Get all days when each library is closed and then the events on those days
 CREATE VIEW NotOnDay AS
 SELECT DISTINCT id
 FROM (
