@@ -4,6 +4,8 @@ DROP VIEW IF EXISTS EventDetails1 CASCADE;
 DROP VIEW IF EXISTS EventDetails2 CASCADE;
 DROP VIEW IF EXISTS EventDetails CASCADE;
 DROP VIEW IF EXISTS OutOfBoundsEvents CASCADE;
+DROP VIEW IF EXISTS AllCombos CASCADE;
+DROP VIEW IF EXISTS NotOnDay CASCADE;
 DROP VIEW IF EXISTS NoSessions CASCADE;
 
 -- Get the id, room, start and end time of each event
@@ -16,23 +18,41 @@ CREATE VIEW EventDetails2 AS
 SELECT ed1.id, lr.library, ed1.edate, ed1.start_time, ed1.end_time 
 FROM EventDetails1 ed1 JOIN LibraryRoom lr ON ed1.room = lr.id;
 
--- Get id, library, start and end time of each event and open adn close time of each library
+-- Get id, library, start and end time of each event and open and close time of each library
 CREATE VIEW EventDetails AS 
-SELECT ed2.id, ed2.library, ed2.start_time, ed2.end_time, lh.day, lh.start_time AS open, lh.end_time AS close
-FROM EventDetails2 ed2 JOIN LibraryHours lh ON ed2.library = lh.library
-WHERE ed2.edate = CAST(lh.day AS VARCHAR);
+SELECT ed2.id, ed2.library, ed2.edate, ed2.start_time, ed2.end_time, lh.day, lh.start_time AS open, lh.end_time AS close
+FROM EventDetails2 ed2 JOIN LibraryHours lh ON ed2.library = lh.library;
 
 -- Get all event ids that are out of bounds
 CREATE VIEW OutOfBoundsEvents AS
 SELECT DISTINCT id
 FROM EventDetails
-WHERE start_time < open
-OR end_time > close;
+WHERE edate = CAST(day AS VARCHAR)
+AND (
+    start_time < open
+    OR end_time > close
+);
+
+CREATE VIEW AllCombos AS
+SELECT *
+FROM (SELECT DISTINCT library FROM LibraryHours) l, (SELECT DISTINCT day FROM LibraryHours) d;
+
+CREATE VIEW NotOnDay AS
+SELECT DISTINCT id
+FROM (
+    (SELECT * FROM AllCombos)
+    EXCEPT
+    (SELECT library, day FROM LibraryHours)
+) n JOIN EventDetails ed
+ON n.library = ed.library
+AND CAST(n.day AS VARCHAR) = ed.edate;
 
 -- Delete all out of bounds events
 DELETE FROM EventSchedule
 WHERE event IN (
-    SELECT id FROM OutOfBoundsEvents
+    (SELECT id FROM OutOfBoundsEvents)
+    UNION
+    (SELECT id FROM NotOnDay)
 );
 
 -- Get all events that no longer have any sessions
