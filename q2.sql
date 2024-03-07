@@ -11,14 +11,33 @@ create table q2 (
     overdue INT NOT NULL
 );
 
--- Do this for each of the views that define your intermediate steps.
--- (But give them better names!) The IF EXISTS avoids generating an error
--- the first time this file is imported.
--- If you do not define any views, you can delete the lines about views.
-DROP VIEW IF EXISTS intermediate_step CASCADE;
-
--- Define views for your intermediate steps here:
-CREATE VIEW intermediate_step AS ... ;
+DROP VIEW IF EXISTS NonreturnOverdue CASCADE;
+CREATE VIEW NonreturnOverdue AS
+SELECT 
+    LB.code AS branch,
+    P.card_number AS patron,
+    H.title,
+    EXTRACT(day FROM CURRENT_DATE - (C.checkout_time + interval '1 day' * 
+        CASE 
+            WHEN H.htype IN ('books', 'audiobooks') THEN 21 
+            WHEN H.htype IN ('movies', 'music', 'magazines and newspapers') THEN 7 
+        END)) AS overdue
+FROM 
+    Checkout C
+    JOIN LibraryHolding LH ON C.copy = LH.barcode
+    JOIN Holding H ON LH.holding = H.id
+    JOIN LibraryBranch LB ON LH.library = LB.code
+    JOIN Patron P ON C.patron = P.card_number
+    LEFT JOIN Return R ON C.id = R.checkout
+WHERE 
+    LB.ward IN (SELECT id FROM Ward WHERE name = 'Parkdale-High Park')
+    AND R.return_time IS NULL 
+    AND CURRENT_DATE > (C.checkout_time + interval '1 day' * 
+        CASE 
+            WHEN H.htype IN ('books', 'audiobooks') THEN 21 
+            WHEN H.htype IN ('movies', 'music', 'magazines and newspapers') THEN 7 
+        END)::date;
 
 -- Your query that answers the question goes below the "insert into" line:
 INSERT INTO q2
+SELECT * FROM NonreturnOverdue
