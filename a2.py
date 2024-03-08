@@ -158,7 +158,105 @@ class Library:
         Return True if the operation was successful (as per the above criteria),
         and False otherwise. Your method must NOT throw an error.
         """
+        try:
+            cursor = self.connection.cursor()
+            
+            # Get all existing card numbers
+            cursor.execute("""
+                           SELECT card_number
+                           FROM Patron;
+                           """)
+            
+            cardNumbers = cursor.fetchall()
+            cardNumbers = [item.strip() for tuple in cardNumbers for item in tuple]
+
+            # Check if card_number exists and if not return false
+            if card_number not in cardNumbers:
+                print("1")
+                return False
+            
+            # Get all existing event ids
+            cursor.execute("""
+                           SELECT id
+                           FROM LibraryEvent;
+                           """)
+            
+            eventIds = cursor.fetchall()
+            eventIds = [item for tuple in eventIds for item in tuple]
+
+            # Check if event_id exists and if not return false
+            if event_id not in eventIds:
+                print("2")
+                return False
+            
+            # Drop existing views
+            cursor.execute("DROP VIEW IF EXISTS PatronEvents CASCADE;")
+            cursor.execute("DROP VIEW IF EXISTS AlreadyBusy CASCADE;")
+            self.connection.commit()
+
+            # Get all events that given patron is signed up for
+            cursor.execute("""
+                           CREATE VIEW PatronEvents AS
+                           SELECT esu.patron, esu.event, es.edate, es.start_time, es.end_time
+                           FROM EventSignUp esu
+                           JOIN EventSchedule es ON esu.event = es.event
+                           WHERE patron = %s;
+                           """,
+                           [card_number])
+            self.connection.commit()
+
+            # Get all event ids that card_number signed up for
+            cursor.execute("""
+                           SELECT DISTINCT event
+                           FROM PatronEvents;
+                           """)
+            
+            allEvents = cursor.fetchall()
+            allEvents = [item for tuple in allEvents for item in tuple]
+
+            if event_id in allEvents:
+                print("3")
+                return False
+            
+             # Check if patron has signed up for an event at the same time as this new event
+            cursor.execute("""
+                           SELECT *
+                           FROM PatronEvents pe, (
+                                SELECT *
+                                FROM EventSchedule
+                                WHERE event = %s
+                           ) es
+                           WHERE pe.edate = es.edate
+                           AND (
+                                (es.start_time > pe.start_time AND es.start_time < pe.end_time)
+                                OR (es.end_time > pe.start_time AND es.end_time < pe.end_time)
+                           );
+                           """,
+                           [event_id])
+            
+            alreadyBusy = cursor.fetchall()
+            alreadyBusy = [item for tuple in alreadyBusy for item in tuple]
+
+            if alreadyBusy:
+                print("4")
+                return False
+            
+            # Sing user up for event
+            cursor.execute("""
+                           INSERT INTO EventSignUp
+                           VALUES (%s, %s)
+                           """,
+                           [card_number, event_id])
+            self.connection.commit()
+            print("5")
+            cursor.close()
+            return True
         
+        except Exception as e:
+            print(e)
+            return False
+
+
 
     def return_item(self, checkout: int) -> float:
         """Record that the checked-out library item, with the checkout id
