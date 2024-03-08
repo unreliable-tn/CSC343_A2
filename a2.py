@@ -104,7 +104,43 @@ class Library:
         Your method must NOT throw an error. Return an empty list if an error
         occurs.
         """
-        
+        try:
+            cursor = self.connection.cursor()
+
+            # Drop existing views
+            cursor.execute("""
+                           DROP VIEW IF EXISTS HoldingDetails CASCADE;
+                           """)
+            self.connection.commit()
+
+            # Create view to get the title, contributor and last_name for each holding
+            cursor.execute("""
+                           CREATE VIEW HoldingDetails AS
+                           SELECT lc.library, hc.holding, h.title, hc.contributor, c.last_name
+                           FROM Holding h
+                           JOIN HoldingContributor hc ON h.id = hc.holding
+                           JOIN Contributor c ON hc.contributor = c.id
+                           JOIN librarycatalogue lc ON h.id = lc.holding;
+                           """)
+            self.connection.commit()
+            
+            # Get all titles from given branch with contributor with given last name
+            cursor.execute("""
+                           SELECT title
+                           FROM HoldingDetails
+                           WHERE library = %s
+                           AND last_name = %s;
+                           """,
+                           [branch, last_name])
+
+            result = cursor.fetchall()
+            cursor.close()
+
+            result = [item for tuple in result for item in tuple]
+            return result
+
+        except:
+            return [] 
 
     def register(self, card_number: str, event_id: int) -> bool:
         """Record the registration of the patron with the card number
