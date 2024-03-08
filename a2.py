@@ -172,7 +172,6 @@ class Library:
 
             # Check if card_number exists and if not return false
             if card_number not in cardNumbers:
-                print("1")
                 return False
             
             # Get all existing event ids
@@ -186,7 +185,6 @@ class Library:
 
             # Check if event_id exists and if not return false
             if event_id not in eventIds:
-                print("2")
                 return False
             
             # Drop existing views
@@ -215,7 +213,6 @@ class Library:
             allEvents = [item for tuple in allEvents for item in tuple]
 
             if event_id in allEvents:
-                print("3")
                 return False
             
              # Check if patron has signed up for an event at the same time as this new event
@@ -238,7 +235,6 @@ class Library:
             alreadyBusy = [item for tuple in alreadyBusy for item in tuple]
 
             if alreadyBusy:
-                print("4")
                 return False
             
             # Sing user up for event
@@ -248,12 +244,11 @@ class Library:
                            """,
                            [card_number, event_id])
             self.connection.commit()
-            print("5")
+            
             cursor.close()
             return True
         
-        except Exception as e:
-            print(e)
+        except:
             return False
 
 
