@@ -1,2 +1,4 @@
 testData*
 import_data_test.sql
+.idea/
+__pycache__/

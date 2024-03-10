@@ -22,6 +22,7 @@ This file contains the Library class and some simple testing functions.
 import psycopg2 as pg
 import psycopg2.extensions as pg_ext
 import psycopg2.extras as pg_extras
+from datetime import datetime, timedelta
 from typing import Optional, List
 import subprocess
 
@@ -123,7 +124,7 @@ class Library:
                            JOIN librarycatalogue lc ON h.id = lc.holding;
                            """)
             self.connection.commit()
-            
+
             # Get all titles from given branch with contributor with given last name
             cursor.execute("""
                            SELECT title
@@ -140,7 +141,7 @@ class Library:
             return result
 
         except:
-            return [] 
+            return []
 
     def register(self, card_number: str, event_id: int) -> bool:
         """Record the registration of the patron with the card number
@@ -160,33 +161,33 @@ class Library:
         """
         try:
             cursor = self.connection.cursor()
-            
+
             # Get all existing card numbers
             cursor.execute("""
                            SELECT card_number
                            FROM Patron;
                            """)
-            
+
             cardNumbers = cursor.fetchall()
             cardNumbers = [item.strip() for tuple in cardNumbers for item in tuple]
 
             # Check if card_number exists and if not return false
             if card_number not in cardNumbers:
                 return False
-            
+
             # Get all existing event ids
             cursor.execute("""
                            SELECT id
                            FROM LibraryEvent;
                            """)
-            
+
             eventIds = cursor.fetchall()
             eventIds = [item for tuple in eventIds for item in tuple]
 
             # Check if event_id exists and if not return false
             if event_id not in eventIds:
                 return False
-            
+
             # Drop existing views
             cursor.execute("DROP VIEW IF EXISTS PatronEvents CASCADE;")
             cursor.execute("DROP VIEW IF EXISTS AlreadyBusy CASCADE;")
@@ -208,14 +209,14 @@ class Library:
                            SELECT DISTINCT event
                            FROM PatronEvents;
                            """)
-            
+
             allEvents = cursor.fetchall()
             allEvents = [item for tuple in allEvents for item in tuple]
 
             if event_id in allEvents:
                 return False
-            
-             # Check if patron has signed up for an event at the same time as this new event
+
+            # Check if patron has signed up for an event at the same time as this new event
             cursor.execute("""
                            SELECT *
                            FROM PatronEvents pe, (
@@ -230,13 +231,13 @@ class Library:
                            );
                            """,
                            [event_id])
-            
+
             alreadyBusy = cursor.fetchall()
             alreadyBusy = [item for tuple in alreadyBusy for item in tuple]
 
             if alreadyBusy:
                 return False
-            
+
             # Sing user up for event
             cursor.execute("""
                            INSERT INTO EventSignUp
@@ -244,23 +245,19 @@ class Library:
                            """,
                            [card_number, event_id])
             self.connection.commit()
-            
+
             cursor.close()
             return True
-        
+
         except:
             return False
-
-
 
     def return_item(self, checkout: int) -> float:
         """Record that the checked-out library item, with the checkout id
         <checkout> was returned at the current time and return the fines 
         incurred on that item.
 
-        Do so by inserting a row in the Return table and updating the
-        LibraryCatalogue table to indicate the revised number of copies
-        available.
+        Do so by inserting a row in the Return table.
 
         Use the same due date rules as the SQL queries.
 
@@ -273,14 +270,67 @@ class Library:
         criteria are satisfied:
             (1) The checkout id <checkout> provided is valid.
             (2) A return has not already been recorded for this checkout.
-            (3) Updating the LibraryCatalogue won't cause the number of
-                available copies to exceed the number of holdings.
 
         If the return operation is successful, make all necessary modifications
         (indicated above) and return the amount of fines incurred.
         Otherwise, the db instance should NOT be modified at all and a value of
         -1.0 should be returned. Your method must NOT throw an error.
         """
+        try:
+            cursor = self.connection.cursor()
+
+            cursor.execute("""
+                            SELECT C.id, C.checkout_time, H.htype 
+                            FROM Checkout C
+                            JOIN LibraryHolding LH ON C.copy = LH.barcode
+                            JOIN Holding H ON LH.holding = H.id
+                            WHERE C.id = %s;
+                            """,
+                           [checkout])
+            checkout_details = cursor.fetchone()
+            if checkout_details is None:
+                return -1.0  # Checkout ID is invalid or not found
+
+            cursor.execute("""
+                            SELECT * FROM Return WHERE checkout = %s;
+                            """,
+                           [checkout])
+            if cursor.fetchone() is not None:
+                return -1.0  # Return already recorded
+
+            # Record the return
+            cursor.execute("""
+                            INSERT INTO Return (checkout, return_time) VALUES (%s,NOW());
+                            """,
+                           [checkout])
+
+            # Calculate the fines based on the holding type and overdue days
+            cursor.execute("""
+                            SELECT 
+                                DATE_PART('day', CURRENT_DATE - (C.checkout_time + INTERVAL '1 day' * 
+                                    CASE 
+                                        WHEN H.htype IN ('books', 'audiobooks') THEN 21 
+                                        ELSE 7 
+                                    END)) AS overdue_days
+                            FROM 
+                                Checkout C
+                                JOIN LibraryHolding LH ON C.copy = LH.barcode
+                                JOIN Holding H ON LH.holding = H.id
+                            WHERE 
+                                C.id = %s;
+                            """,
+                           [checkout])
+
+            overdue_days_fetch = cursor.fetchone()
+            overdue_days = max(overdue_days_fetch[0], 0)
+            fines = overdue_days * 0.5 if checkout_details[2] in ['books', 'audiobooks'] else overdue_days * 1.0
+
+            self.connection.commit()
+            cursor.close()
+            return fines
+
+        except:
+            return -1.0
 
 
 def test_preliminary() -> None:
@@ -292,8 +342,8 @@ def test_preliminary() -> None:
     """
     # TODO: Change the values of the following variables to connect to your
     #  own database:
-    dbname = "csc343h-userid"
-    user = "userid"
+    dbname = "csc343h-nimingha"
+    user = "nimingha"
     password = ""
 
     a2 = Library()
