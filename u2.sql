@@ -14,8 +14,8 @@ WHERE LibraryBranch.name = 'Downsview'
 GROUP BY patron
 HAVING COUNT(*) <= 5;
 
-DROP VIEW IF EXISTS PatronBooks CASCADE;
-CREATE VIEW PatronBooks AS
+DROP VIEW IF EXISTS DownsviewBooks CASCADE;
+CREATE VIEW DownsviewBooks AS
 SELECT barcode
 FROM LibraryHolding
 JOIN Holding ON LibraryHolding.holding = Holding.id
